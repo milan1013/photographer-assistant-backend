@@ -53,3 +53,4 @@ class SharedGalleryResponse(BaseModel):
     image_count: int
     branding_name: str | None = None
     branding_logo_url: str | None = None
+    bio: str | None = None

@@ -67,6 +67,7 @@ async def shared_gallery_info(
         image_count=count,
         branding_name=owner.branding_name if owner else None,
         branding_logo_url=owner.branding_logo_url if owner else None,
+        bio=owner.bio if owner else None,
     )
 
 

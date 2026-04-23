@@ -7,3 +7,4 @@ storage/
 *.egg-info/
 .pytest_cache/
 backups/
+tests/reports/
