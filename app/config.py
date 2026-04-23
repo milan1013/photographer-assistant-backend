@@ -7,11 +7,21 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/photographer_assistant"
 
-    # JWT
-    jwt_secret_key: str = "change-me-in-production"
-    jwt_algorithm: str = "HS256"
-    access_token_expire_minutes: int = 15
-    refresh_token_expire_days: int = 7
+    # Auth0
+    auth0_domain: str = "dev-xurif6k6cvmaiq7h.us.auth0.com"
+    auth0_audience: str = "https://fotomil.xyz/api"
+    auth0_algorithms: list[str] = ["RS256"]
+
+    auth0_client_id: str = "qN5srsmAHZ0R0FjidNIhuBzzdbC1Bhhm"
+    auth0_mgmt_client_id: str = ""
+    auth0_mgmt_client_secret: str = ""
+
+    # Admin
+    admin_emails: list[str] = []
+
+    # Lab portal auth
+    jwt_secret_key: str = "change-me-in-production-12345"
+    lab_token_expire_hours: int = 24
 
     # Storage
     storage_backend: str = "local"  # "local" or "s3"
@@ -30,20 +40,21 @@ class Settings(BaseSettings):
     max_galleries_per_user: int = 50
     max_images_per_gallery: int = 500
 
-    # Email (Resend)
+    # Email (Resend) — used for notifications, not auth
     resend_api_key: str = ""
-    email_from: str = "Fotobir <onboarding@resend.dev>"
+    email_from: str = "FotoMil <noreply@fotomil.xyz>"
     app_url: str = "http://localhost"
-    password_reset_expire_minutes: int = 30
 
     # Pricing (for invoice generation)
     default_price_per_copy: float = 5.0
     currency: str = "RSD"
 
     # Rate limiting
-    rate_limit_login: str = "5/minute"
-    rate_limit_register: str = "5/minute"
-    rate_limit_refresh: str = "10/minute"
+    rate_limit_default: str = "30/minute"
+
+    # Sentry
+    sentry_dsn: str = ""
+    sentry_environment: str = "development"
 
     # CORS
     cors_origins: list[str] = ["http://localhost:5173"]
