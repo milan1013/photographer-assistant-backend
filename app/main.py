@@ -27,7 +27,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("fotomil")
 
-from app.routes import auth, galleries, images, shares, shared_access, export, labs, orders, lab_portal  # noqa: E402
+from app.routes import auth, galleries, images, shares, shared_access, export, labs, orders, lab_portal, lab_applications  # noqa: E402
 
 
 @asynccontextmanager
@@ -82,6 +82,7 @@ app.include_router(export.router, prefix="/api", tags=["export"])
 app.include_router(labs.router, prefix="/api", tags=["labs"])
 app.include_router(orders.router, prefix="/api", tags=["orders"])
 app.include_router(lab_portal.router, prefix="/api", tags=["lab-portal"])
+app.include_router(lab_applications.router, prefix="/api", tags=["lab-applications"])
 
 
 @app.exception_handler(Exception)

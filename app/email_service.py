@@ -51,6 +51,139 @@ def send_password_reset_email(to_email: str, reset_token: str) -> bool:
         return False
 
 
+def send_application_received_to_lab(lab_email: str, lab_name: str) -> bool:
+    """Confirm to the applicant that we received their partnership application."""
+    if not settings.resend_api_key:
+        logger.warning("RESEND_API_KEY not set, skipping application receipt to %s", lab_email)
+        return False
+
+    resend.api_key = settings.resend_api_key
+    try:
+        resend.Emails.send({
+            "from": settings.email_from,
+            "to": [lab_email],
+            "subject": "FotoMil - Prijava primljena / Application received",
+            "html": f"""
+            <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:20px;">
+                <h2>Prijava za partnerstvo primljena</h2>
+                <p>Hvala vam, <strong>{lab_name}</strong>! Primili smo vašu prijavu za partnerstvo sa FotoMil.</p>
+                <p>Pregledamo prijavu i kontaktiraćemo vas uskoro.</p>
+                <hr style="border:none;border-top:1px solid #e5e5e5;margin:20px 0;" />
+                <p style="font-size:12px;color:#a3a3a3;">FotoMil - fotomil.xyz</p>
+            </div>
+            """,
+        })
+        logger.info("Application receipt sent to %s", lab_email)
+        return True
+    except Exception as e:
+        logger.error("Failed to send application receipt to %s: %s", lab_email, e)
+        return False
+
+
+def send_application_to_admin(admin_email: str, application_data: dict) -> bool:
+    """Notify admin about a new partnership application."""
+    if not settings.resend_api_key:
+        logger.warning("RESEND_API_KEY not set, skipping admin alert to %s", admin_email)
+        logger.info("New application: %s", application_data)
+        return False
+
+    resend.api_key = settings.resend_api_key
+    base_url = settings.app_url.rstrip("/")
+    try:
+        resend.Emails.send({
+            "from": settings.email_from,
+            "to": [admin_email],
+            "subject": f"FotoMil - Nova prijava laboratorije: {application_data.get('lab_name', '')}",
+            "html": f"""
+            <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:20px;">
+                <h2>Nova prijava za partnerstvo</h2>
+                <p><strong>Naziv:</strong> {application_data.get("lab_name", "")}</p>
+                <p><strong>Email:</strong> {application_data.get("lab_email", "")}</p>
+                <p><strong>Telefon:</strong> {application_data.get("lab_phone") or "—"}</p>
+                <p><strong>Adresa:</strong> {application_data.get("lab_address") or "—"}</p>
+                <p><strong>Veb sajt:</strong> {application_data.get("lab_website") or "—"}</p>
+                {f'<p><strong>Poruka:</strong></p><p style="background:#f5f5f5;padding:12px;border-radius:6px;">{application_data.get("message")}</p>' if application_data.get("message") else ""}
+                <a href="{base_url}/admin" style="display:inline-block;background:#171717;color:#fafafa;padding:12px 24px;border-radius:6px;text-decoration:none;margin:16px 0;">
+                    Pregledaj u admin panelu
+                </a>
+                <hr style="border:none;border-top:1px solid #e5e5e5;margin:20px 0;" />
+                <p style="font-size:12px;color:#a3a3a3;">FotoMil - fotomil.xyz</p>
+            </div>
+            """,
+        })
+        logger.info("Admin alert sent to %s for new application", admin_email)
+        return True
+    except Exception as e:
+        logger.error("Failed to send admin alert to %s: %s", admin_email, e)
+        return False
+
+
+def send_application_approved(lab_email: str, lab_name: str, magic_link_url: str) -> bool:
+    """Tell the lab their application was approved + magic-link to log in."""
+    if not settings.resend_api_key:
+        logger.warning("RESEND_API_KEY not set, skipping approval email to %s", lab_email)
+        logger.info("Approval link: %s", magic_link_url)
+        return False
+
+    resend.api_key = settings.resend_api_key
+    try:
+        resend.Emails.send({
+            "from": settings.email_from,
+            "to": [lab_email],
+            "subject": "FotoMil - Vaša prijava je odobrena!",
+            "html": f"""
+            <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:20px;">
+                <h2>Dobrodošli na FotoMil, {lab_name}!</h2>
+                <p>Vaša prijava za partnerstvo je <strong>odobrena</strong>.</p>
+                <p>Kliknite na dugme ispod da se prijavite u portal za laboratorije i podesite vaše proizvode:</p>
+                <a href="{magic_link_url}" style="display:inline-block;background:#171717;color:#fafafa;padding:12px 24px;border-radius:6px;text-decoration:none;margin:16px 0;">
+                    Prijavi se u portal
+                </a>
+                <p style="font-size:14px;color:#737373;">Link ističe za {settings.lab_token_expire_hours} sati.</p>
+                <hr style="border:none;border-top:1px solid #e5e5e5;margin:20px 0;" />
+                <p style="font-size:12px;color:#a3a3a3;">FotoMil - fotomil.xyz</p>
+            </div>
+            """,
+        })
+        logger.info("Approval email sent to %s", lab_email)
+        return True
+    except Exception as e:
+        logger.error("Failed to send approval email to %s: %s", lab_email, e)
+        logger.info("Approval link (fallback): %s", magic_link_url)
+        return False
+
+
+def send_application_rejected(lab_email: str, lab_name: str, reason: str | None) -> bool:
+    """Tell the lab their application was rejected."""
+    if not settings.resend_api_key:
+        logger.warning("RESEND_API_KEY not set, skipping rejection email to %s", lab_email)
+        return False
+
+    resend.api_key = settings.resend_api_key
+    try:
+        reason_html = f'<p>{reason}</p>' if reason else ''
+        resend.Emails.send({
+            "from": settings.email_from,
+            "to": [lab_email],
+            "subject": "FotoMil - Status vaše prijave",
+            "html": f"""
+            <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:20px;">
+                <h2>Hvala vam, {lab_name}</h2>
+                <p>Nažalost, ne možemo da vam u ovom trenutku odobrimo prijavu za partnerstvo na FotoMil-u.</p>
+                {reason_html}
+                <p>Cenimo vaše interesovanje i želimo vam puno uspeha.</p>
+                <hr style="border:none;border-top:1px solid #e5e5e5;margin:20px 0;" />
+                <p style="font-size:12px;color:#a3a3a3;">FotoMil - fotomil.xyz</p>
+            </div>
+            """,
+        })
+        logger.info("Rejection email sent to %s", lab_email)
+        return True
+    except Exception as e:
+        logger.error("Failed to send rejection email to %s: %s", lab_email, e)
+        return False
+
+
 def send_lab_magic_link(lab_email: str, token: str) -> bool:
     """Send magic link to lab for logging into the lab portal."""
     base_url = settings.app_url.rstrip("/")
