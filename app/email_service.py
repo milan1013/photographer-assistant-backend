@@ -118,11 +118,15 @@ def send_application_to_admin(admin_email: str, application_data: dict) -> bool:
         return False
 
 
-def send_application_approved(lab_email: str, lab_name: str, magic_link_url: str) -> bool:
-    """Tell the lab their application was approved + magic-link to log in."""
+def send_application_approved(lab_email: str, lab_name: str, login_url: str) -> bool:
+    """Tell the lab their application was approved.
+
+    A separate Auth0 'set password' email is sent by the approval flow; this email
+    is just a friendly welcome pointing them to the lab login page.
+    """
     if not settings.resend_api_key:
         logger.warning("RESEND_API_KEY not set, skipping approval email to %s", lab_email)
-        logger.info("Approval link: %s", magic_link_url)
+        logger.info("Login URL: %s", login_url)
         return False
 
     resend.api_key = settings.resend_api_key
@@ -135,11 +139,11 @@ def send_application_approved(lab_email: str, lab_name: str, magic_link_url: str
             <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:20px;">
                 <h2>Dobrodošli na FotoMil, {lab_name}!</h2>
                 <p>Vaša prijava za partnerstvo je <strong>odobrena</strong>.</p>
-                <p>Kliknite na dugme ispod da se prijavite u portal za laboratorije i podesite vaše proizvode:</p>
-                <a href="{magic_link_url}" style="display:inline-block;background:#171717;color:#fafafa;padding:12px 24px;border-radius:6px;text-decoration:none;margin:16px 0;">
+                <p>Poslali smo vam zaseban email za podešavanje lozinke. Kada postavite lozinku, prijavite se u portal:</p>
+                <a href="{login_url}" style="display:inline-block;background:#171717;color:#fafafa;padding:12px 24px;border-radius:6px;text-decoration:none;margin:16px 0;">
                     Prijavi se u portal
                 </a>
-                <p style="font-size:14px;color:#737373;">Link ističe za {settings.lab_token_expire_hours} sati.</p>
+                <p style="font-size:14px;color:#737373;">Ako ne dobijete email za podešavanje lozinke u nekoliko minuta, kontaktirajte nas.</p>
                 <hr style="border:none;border-top:1px solid #e5e5e5;margin:20px 0;" />
                 <p style="font-size:12px;color:#a3a3a3;">FotoMil - fotomil.xyz</p>
             </div>
@@ -149,7 +153,6 @@ def send_application_approved(lab_email: str, lab_name: str, magic_link_url: str
         return True
     except Exception as e:
         logger.error("Failed to send approval email to %s: %s", lab_email, e)
-        logger.info("Approval link (fallback): %s", magic_link_url)
         return False
 
 

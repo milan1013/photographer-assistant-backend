@@ -1,6 +1,7 @@
 """Auth0 Management API utilities."""
 
 import logging
+import secrets
 import time
 
 import httpx
@@ -67,6 +68,67 @@ async def get_user_identities(auth0_sub: str) -> list[dict]:
             {"provider": i["provider"], "connection": i["connection"]}
             for i in user_data.get("identities", [])
         ]
+
+
+async def find_user_by_email(email: str) -> dict | None:
+    """Find an Auth0 user by email. Returns user dict or None."""
+    token = await _get_mgmt_token()
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"https://{settings.auth0_domain}/api/v2/users-by-email",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"email": email.lower()},
+        )
+        if resp.status_code != 200:
+            logger.warning("users-by-email failed: %s", resp.text)
+            return None
+        users = resp.json()
+        return users[0] if users else None
+
+
+async def create_db_user(email: str, name: str, app_metadata: dict | None = None) -> dict | None:
+    """Create an Auth0 db-connection user with a random password.
+    Returns user dict on success (including 'user_id'), None on failure.
+    The caller should trigger a password reset so the user can set their own password.
+    """
+    token = await _get_mgmt_token()
+    # Generate a random password the user will never use — they reset it via email.
+    random_password = secrets.token_urlsafe(32) + "Aa1!"
+    payload = {
+        "connection": "Username-Password-Authentication",
+        "email": email.lower(),
+        "name": name,
+        "password": random_password,
+        "email_verified": False,
+        "verify_email": False,
+    }
+    if app_metadata:
+        payload["app_metadata"] = app_metadata
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"https://{settings.auth0_domain}/api/v2/users",
+            headers={"Authorization": f"Bearer {token}"},
+            json=payload,
+        )
+        if resp.status_code not in (200, 201):
+            logger.error("Failed to create Auth0 user %s: %s", email, resp.text)
+            return None
+        return resp.json()
+
+
+async def update_user_app_metadata(auth0_sub: str, app_metadata: dict) -> bool:
+    """Merge new app_metadata onto an existing Auth0 user."""
+    token = await _get_mgmt_token()
+    async with httpx.AsyncClient() as client:
+        resp = await client.patch(
+            f"https://{settings.auth0_domain}/api/v2/users/{auth0_sub}",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"app_metadata": app_metadata},
+        )
+        if resp.status_code != 200:
+            logger.error("Failed to update app_metadata for %s: %s", auth0_sub, resp.text)
+            return False
+        return True
 
 
 async def delete_auth0_user(auth0_sub: str) -> bool:

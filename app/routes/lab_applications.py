@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.lab_auth import create_lab_token
 from app.models.user import User
 from app.rate_limit import limiter
 from app.crud.lab_applications import (
@@ -132,12 +131,29 @@ async def admin_approve_application(
         approved_lab_id=lab.id,
     )
 
-    # Send approval email with magic-link
-    token = create_lab_token(str(lab.id))
+    # Provision Auth0 user with role=lab so they can log in via Auth0 Universal Login
+    from app.auth0_mgmt import (
+        find_user_by_email, create_db_user, update_user_app_metadata,
+        send_password_reset_email,
+    )
     base_url = settings.app_url.rstrip("/")
-    magic_link = f"{base_url}/lab/login?token={token}"
+    login_url = f"{base_url}/lab/login"
+    app_metadata = {"role": "lab", "lab_id": str(lab.id)}
+
     try:
-        send_application_approved(lab.email, lab.name, magic_link)
+        existing = await find_user_by_email(lab.email)
+        if existing:
+            await update_user_app_metadata(existing["user_id"], app_metadata)
+        else:
+            await create_db_user(lab.email, lab.name, app_metadata=app_metadata)
+        # Trigger Auth0 password-set email so the lab can pick a password
+        await send_password_reset_email(lab.email)
+    except Exception as e:
+        logger.warning("Auth0 provisioning failed for %s: %s", lab.email, e)
+
+    # Send our own welcome email pointing them to the lab login page
+    try:
+        send_application_approved(lab.email, lab.name, login_url)
     except Exception as e:
         logger.warning("Failed to send approval email: %s", e)
 
