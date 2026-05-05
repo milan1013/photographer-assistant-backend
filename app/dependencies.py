@@ -86,7 +86,11 @@ async def get_current_lab(
     token: Optional[str] = Query(None, alias="token"),
     db: AsyncSession = Depends(get_db),
 ):
-    """Authenticate a lab via Bearer token from magic link, or query param."""
+    """Authenticate a lab via Auth0 Bearer token (preferred) or legacy magic-link JWT.
+
+    Tries Auth0 first: token must include `app_metadata.role == "lab"` and `app_metadata.lab_id`
+    (added by the post-login Auth0 Action). Falls back to magic-link JWT for backward compat.
+    """
     from app.lab_auth import decode_lab_token
     from app.models.lab import Lab
 
@@ -94,9 +98,22 @@ async def get_current_lab(
     if not jwt_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
-    lab_id = decode_lab_token(jwt_token)
-    if not lab_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired lab token")
+    # Try Auth0 first
+    lab_id: str | None = None
+    payload = decode_auth0_token(jwt_token)
+    if payload is not None:
+        # Custom claims set by the post-login Auth0 Action
+        role = payload.get("role") or payload.get("https://fotomil.xyz/role")
+        if role != "lab":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized as lab")
+        lab_id = payload.get("lab_id") or payload.get("https://fotomil.xyz/lab_id")
+        if not lab_id:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Lab id missing in token")
+    else:
+        # Fallback: legacy magic-link JWT
+        lab_id = decode_lab_token(jwt_token)
+        if not lab_id:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired lab token")
 
     result = await db.execute(select(Lab).where(Lab.id == lab_id))
     lab = result.scalar_one_or_none()

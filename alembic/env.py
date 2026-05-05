@@ -5,7 +5,7 @@ from alembic import context
 
 from app.config import settings
 from app.database import Base
-from app.models import User, Gallery, Image, ShareLink, GalleryView, Comment, Lab, LabProduct, PrintOrder, OrderItem  # noqa: F401
+from app.models import User, Gallery, Image, ShareLink, GalleryView, Comment, Lab, LabProduct, PrintOrder, OrderItem, LabApplication  # noqa: F401
 
 config = context.config
 
